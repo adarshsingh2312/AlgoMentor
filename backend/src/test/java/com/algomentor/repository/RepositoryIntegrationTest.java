@@ -101,16 +101,16 @@ class RepositoryIntegrationTest {
         assertThat(fetchedProblem.getProblemIndex()).isEqualTo("A");
         assertThat(fetchedProblem.getName()).isEqualTo("Going Home");
         assertThat(fetchedProblem.getTags())
-                .hasSize(2)
+                .hasSize(3)
                 .extracting(Tag::getName)
-                .containsExactlyInAnyOrder("dp", "graphs");
+                .containsExactlyInAnyOrder("dp", "graphs", "greedy");
 
         // 7. Read back and verify Submission
         Optional<Submission> fetchedSubmissionOpt = submissionRepository.findByCfSubmissionId(999888777L);
         assertThat(fetchedSubmissionOpt).isPresent();
         Submission fetchedSubmission = fetchedSubmissionOpt.get();
         assertThat(fetchedSubmission.getVerdict()).isEqualTo("OK");
-        assertThat(fetchedSubmission.getLanguage()).isEqualTo("GNU C++17");
+        assertThat(fetchedSubmission.getLanguage()).isEqualTo("GNU C++20");
         assertThat(fetchedSubmission.getUser().getId()).isEqualTo(savedUser.getId());
         assertThat(fetchedSubmission.getProblem().getId()).isEqualTo(savedProblem.getId());
     }
