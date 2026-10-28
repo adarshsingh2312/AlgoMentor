@@ -14,6 +14,7 @@ import com.algomentor.exception.CodeforcesServiceException;
 import com.algomentor.exception.GlobalExceptionHandler;
 import com.algomentor.repository.UserRepository;
 import com.algomentor.service.JwtService;
+import com.algomentor.service.SyncService;
 import com.algomentor.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,9 @@ class SecurityAndUserControllerTest {
 
     @MockBean
     private UserRepository userRepository;
+
+    @MockBean
+    private SyncService syncService;
 
     @MockBean
     private ClientRegistrationRepository clientRegistrationRepository;

@@ -1,0 +1,7 @@
+app:
+  sync:
+    enabled: false
+  codeforces:
+    min-interval-ms: 0
+    initial-backoff-ms: 10
+    max-attempts: 3
