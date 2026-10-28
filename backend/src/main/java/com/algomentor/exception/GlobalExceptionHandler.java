@@ -9,11 +9,19 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import com.algomentor.exception.CodeforcesUnavailableException;
 
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("Bad Request", ex.getMessage()));
+    }
 
     @ExceptionHandler(CodeforcesHandleNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleCodeforcesHandleNotFound(CodeforcesHandleNotFoundException ex) {
@@ -24,6 +32,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CodeforcesServiceException.class)
     public ResponseEntity<ErrorResponse> handleCodeforcesServiceException(CodeforcesServiceException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_GATEWAY)
+                .body(ErrorResponse.of("Bad Gateway", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CodeforcesUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleCodeforcesUnavailable(CodeforcesUnavailableException ex) {
         return ResponseEntity
                 .status(HttpStatus.BAD_GATEWAY)
                 .body(ErrorResponse.of("Bad Gateway", ex.getMessage()));

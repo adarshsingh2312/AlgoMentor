@@ -31,6 +31,16 @@ app:
     expiry-minutes: ${JWT_EXPIRY_MINUTES:60}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/auth/callback}
+  codeforces:
+    base-url: https://codeforces.com/api
+    timeout-seconds: 10
+    min-interval-ms: 2000
+    max-attempts: 3
+    initial-backoff-ms: 1000
+  sync:
+    enabled: true
+    problemset-cron: "0 0 3 * * *"   # daily 03:00
+    submissions-cron: "0 0 */6 * * *" # every 6 hours
 
 management:
   endpoints:
