@@ -1,4 +1,8 @@
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   application:
     name: algomentor-backend
   datasource:
@@ -41,6 +45,11 @@ app:
     enabled: true
     problemset-cron: "0 0 3 * * *"   # daily 03:00
     submissions-cron: "0 0 */6 * * *" # every 6 hours
+  timezone: "Asia/Kolkata"
+  analytics:
+    min-attempts: 5
+  recommender:
+    daily-count: 3
 
 management:
   endpoints:
