@@ -156,6 +156,46 @@ class RecommendationServiceTest {
         assertThat(result.get(0).reason()).containsIgnoringCase("starter");
     }
 
+    @Test
+    @DisplayName("getOrCreateToday - prefers weak-tag problems over general candidates")
+    void getOrCreateToday_withWeakTags_prefersWeakTagCandidates() {
+        when(recommendationRepository.findByUserIdAndRecommendedDate(testUser.getId(), TODAY))
+                .thenReturn(List.of());
+        when(submissionRepository.findLastSolvedProblemRatings(testUser.getId(), 20))
+                .thenReturn(List.of(1200));
+        when(submissionRepository.findSolvedProblemIdsByUserId(testUser.getId()))
+                .thenReturn(Set.of());
+        when(recommendationRepository.findRecentlyRecommendedProblemIds(any(), any()))
+                .thenReturn(Set.of());
+
+        Tag dpTag = new Tag("dp");
+        when(analyticsService.getWeakTags(testUser.getId(), 5))
+                .thenReturn(List.of(new TagStatDto("dp", 6L, 1L, 0.1667)));
+
+        Problem dpProblem = buildProblem(1200);
+        dpProblem.setName("DP Problem");
+        dpProblem.setTags(Set.of(dpTag));
+
+        Problem general1 = buildProblem(1300);
+        general1.setName("General Problem 1");
+        Problem general2 = buildProblem(1300);
+        general2.setName("General Problem 2");
+
+        when(problemRepository.findWeakTagCandidates(anyInt(), anyInt(), eq(List.of("dp")), anyBoolean(), anySet(), anyInt()))
+                .thenReturn(List.of(dpProblem));
+        when(problemRepository.findGeneralCandidates(anyInt(), anyInt(), anyBoolean(), anySet(), anyInt()))
+                .thenReturn(List.of(general1, general2));
+        when(problemRepository.findByIdInWithTags(anyList()))
+                .thenAnswer(inv -> List.of(dpProblem, general1, general2));
+        when(recommendationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<RecommendationResponseDto> result = service.getOrCreateToday(testUser);
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).problemName()).isEqualTo("DP Problem");
+        assertThat(result.get(0).reason()).contains("Weak tag: dp");
+    }
+
     // ─── updateStatus ─────────────────────────────────────────────────────────
 
     @Test

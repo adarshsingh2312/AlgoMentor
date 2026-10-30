@@ -1,7 +1,9 @@
 package com.algomentor.controller;
 
 import com.algomentor.dto.AdminPingResponse;
+import com.algomentor.dto.DigestRunSummaryDto;
 import com.algomentor.dto.SyncResult;
+import com.algomentor.service.DigestService;
 import com.algomentor.service.SyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final SyncService syncService;
+    private final DigestService digestService;
 
     @GetMapping("/ping")
     public ResponseEntity<AdminPingResponse> ping() {
@@ -25,5 +28,10 @@ public class AdminController {
     @PostMapping("/sync/problemset")
     public ResponseEntity<SyncResult> syncProblemset() {
         return ResponseEntity.ok(syncService.syncProblemset());
+    }
+
+    @PostMapping("/digest/run")
+    public ResponseEntity<DigestRunSummaryDto> runDigest() {
+        return ResponseEntity.ok(digestService.sendDailyDigests());
     }
 }

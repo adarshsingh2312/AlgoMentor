@@ -73,6 +73,9 @@ class SecurityAndUserControllerTest {
     private SyncService syncService;
 
     @MockBean
+    private com.algomentor.service.DigestService digestService;
+
+    @MockBean
     private ClientRegistrationRepository clientRegistrationRepository;
 
     private User regularUser;

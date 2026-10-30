@@ -65,6 +65,9 @@ class SyncControllerTest {
     private SyncService syncService;
 
     @MockBean
+    private com.algomentor.service.DigestService digestService;
+
+    @MockBean
     private ClientRegistrationRepository clientRegistrationRepository;
 
     private User regularUser;
@@ -150,5 +153,29 @@ class SyncControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.problemsInserted").value(12))
                 .andExpect(jsonPath("$.problemsUpdated").value(3));
+    }
+
+    @Test
+    @DisplayName("POST /api/admin/digest/run with USER role -> 403 Forbidden")
+    void runDigestWithUserRoleReturns403() throws Exception {
+        mockMvc.perform(post("/api/admin/digest/run")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Forbidden"));
+    }
+
+    @Test
+    @DisplayName("POST /api/admin/digest/run with ADMIN role -> 200 OK with DigestRunSummaryDto")
+    void runDigestWithAdminRoleReturns200() throws Exception {
+        when(digestService.sendDailyDigests())
+                .thenReturn(new com.algomentor.dto.DigestRunSummaryDto(2, 1, 0, 150));
+
+        mockMvc.perform(post("/api/admin/digest/run")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sent").value(2))
+                .andExpect(jsonPath("$.skipped").value(1))
+                .andExpect(jsonPath("$.failed").value(0))
+                .andExpect(jsonPath("$.durationMs").value(150));
     }
 }
