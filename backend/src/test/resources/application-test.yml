@@ -1,6 +1,8 @@
 app:
   sync:
     enabled: false
+  mail:
+    enabled: false
   codeforces:
     min-interval-ms: 0
     initial-backoff-ms: 10
