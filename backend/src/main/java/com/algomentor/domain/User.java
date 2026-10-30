@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -31,4 +33,10 @@ public class User extends BaseEntity {
 
     @Column(name = "cf_handle")
     private String cfHandle;
+
+    @Column(name = "digest_enabled", nullable = false, columnDefinition = "boolean default true")
+    private boolean digestEnabled = true;
+
+    @Column(name = "last_digest_date")
+    private LocalDate lastDigestDate;
 }

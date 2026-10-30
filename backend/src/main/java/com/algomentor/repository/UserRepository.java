@@ -17,5 +17,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     List<User> findByCfHandleNotNull();
 
+    List<User> findByDigestEnabledTrueAndCfHandleNotNull();
+
     boolean existsByEmail(String email);
 }
