@@ -3,6 +3,8 @@ app:
     enabled: false
   mail:
     enabled: false
+  dsa:
+    seed-enabled: false
   codeforces:
     min-interval-ms: 0
     initial-backoff-ms: 10

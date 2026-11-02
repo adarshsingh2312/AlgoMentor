@@ -17,6 +17,10 @@ spring:
       hibernate:
         format_sql: true
     open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 2MB
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -60,6 +64,10 @@ app:
     from: digest@algomentor.local
     digest-cron: "0 0 7 * * *"
     base-url: ${APP_BASE_URL:http://localhost:5173}
+  dsa:
+    seed-enabled: true
+  notes:
+    max-documents: 50
 
 management:
   endpoints:
