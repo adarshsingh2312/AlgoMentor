@@ -1,9 +1,12 @@
 package com.algomentor.controller;
 
+import com.algomentor.dto.AskNotesRequest;
+import com.algomentor.dto.AskNotesResponseDto;
 import com.algomentor.dto.NoteDocumentDetailDto;
 import com.algomentor.dto.NoteDocumentListDto;
 import com.algomentor.dto.NoteUploadResult;
 import com.algomentor.service.NoteService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -38,6 +41,26 @@ public class NoteController {
         return ResponseEntity.status(HttpStatus.CREATED).body(result.note());
     }
 
+    @PostMapping("/{id}/reindex")
+    public ResponseEntity<NoteDocumentDetailDto> reindexNote(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID id) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return ResponseEntity.ok(noteService.reindex(userId, id));
+    }
+
+    @PostMapping("/ask")
+    public ResponseEntity<AskNotesResponseDto> askNotes(
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody AskNotesRequest request) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return ResponseEntity.ok(noteService.ask(userId, request.question()));
+    }
+
     @GetMapping
     public ResponseEntity<List<NoteDocumentListDto>> listNotes(
             @AuthenticationPrincipal UUID userId) {
@@ -68,4 +91,3 @@ public class NoteController {
         return ResponseEntity.noContent().build();
     }
 }
-

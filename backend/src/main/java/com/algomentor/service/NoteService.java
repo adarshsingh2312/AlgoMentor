@@ -4,14 +4,19 @@ import com.algomentor.config.NotesProperties;
 import com.algomentor.domain.NoteDocument;
 import com.algomentor.domain.NoteStatus;
 import com.algomentor.domain.User;
+import com.algomentor.dto.AskNotesResponseDto;
 import com.algomentor.dto.NoteDocumentDetailDto;
 import com.algomentor.dto.NoteDocumentListDto;
 import com.algomentor.dto.NoteUploadResult;
+import com.algomentor.exception.AiUnavailableException;
 import com.algomentor.repository.NoteDocumentRepository;
 import com.algomentor.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,11 +35,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NoteService {
 
+    private static final Logger log = LoggerFactory.getLogger(NoteService.class);
+
     private final NoteDocumentRepository noteDocumentRepository;
     private final UserRepository userRepository;
     private final NotesProperties notesProperties;
+    private final AiServiceClient aiServiceClient;
 
-    @Transactional
     public NoteUploadResult upload(UUID userId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is required and must not be empty");
@@ -87,17 +94,61 @@ public class NoteService {
             contentType = lowerName.endsWith(".md") ? "text/markdown" : "text/plain";
         }
 
+        // Step 1: Save initial note in short transaction (UPLOADED)
+        NoteDocument saved = saveInitialNote(user, sanitizedName, contentType, bytes.length, contentHash, content);
+
+        // Step 2: Ingest with AI service OUTSIDE any DB transaction
+        NoteStatus finalStatus;
+        try {
+            aiServiceClient.ingest(saved.getId(), userId, saved.getDisplayName(), saved.getContent());
+            finalStatus = NoteStatus.INDEXED;
+        } catch (Exception e) {
+            log.warn("AI indexing failed for noteId={}: {}. Marking status as FAILED", saved.getId(), e.getMessage());
+            finalStatus = NoteStatus.FAILED;
+        }
+
+        // Step 3: Update note status in short transaction
+        NoteDocument updated = updateNoteStatus(saved.getId(), finalStatus);
+        return new NoteUploadResult(toDetailDto(updated), false);
+    }
+
+    @Transactional
+    public NoteDocument saveInitialNote(User user, String displayName, String contentType,
+                                        long sizeBytes, String contentHash, String content) {
         NoteDocument doc = new NoteDocument();
         doc.setUser(user);
-        doc.setDisplayName(sanitizedName);
+        doc.setDisplayName(displayName);
         doc.setContentType(contentType);
-        doc.setSizeBytes(bytes.length);
+        doc.setSizeBytes(sizeBytes);
         doc.setContentHash(contentHash);
         doc.setContent(content);
         doc.setStatus(NoteStatus.UPLOADED);
+        return noteDocumentRepository.save(doc);
+    }
 
-        NoteDocument saved = noteDocumentRepository.save(doc);
-        return new NoteUploadResult(toDetailDto(saved), false);
+    @Transactional
+    public NoteDocument updateNoteStatus(UUID noteId, NoteStatus status) {
+        NoteDocument doc = noteDocumentRepository.findById(noteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found"));
+        doc.setStatus(status);
+        return noteDocumentRepository.save(doc);
+    }
+
+    public NoteDocumentDetailDto reindex(UUID userId, UUID noteId) {
+        NoteDocument doc = noteDocumentRepository.findByIdAndUserId(noteId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found"));
+
+        updateNoteStatus(doc.getId(), NoteStatus.INDEXING);
+
+        try {
+            aiServiceClient.ingest(doc.getId(), userId, doc.getDisplayName(), doc.getContent());
+            NoteDocument updated = updateNoteStatus(doc.getId(), NoteStatus.INDEXED);
+            return toDetailDto(updated);
+        } catch (Exception e) {
+            log.error("Reindex failed for noteId={}: {}", noteId, e.getMessage());
+            updateNoteStatus(doc.getId(), NoteStatus.FAILED);
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -116,19 +167,30 @@ public class NoteService {
         return toDetailDto(doc);
     }
 
-    @Transactional
     public void deleteNote(UUID userId, UUID noteId) {
-        // Return 404 if not found or belongs to another user
+        // Check document ownership first (throws 404 if not found or belongs to another user)
         NoteDocument doc = noteDocumentRepository.findByIdAndUserId(noteId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found"));
+
+        // Order is critical: delete chunks in AI service FIRST
+        // If AI service is down, this throws AiUnavailableException -> 502, keeping the DB row intact
+        aiServiceClient.delete(noteId, userId);
+
+        // Second: delete row in PostgreSQL
+        deleteNoteRow(doc);
+    }
+
+    @Transactional
+    public void deleteNoteRow(NoteDocument doc) {
         noteDocumentRepository.delete(doc);
     }
 
+    public AskNotesResponseDto ask(UUID userId, String question) {
+        return aiServiceClient.ask(userId, question, 4);
+    }
+
     private String sanitizeFilename(String filename) {
-        // Strip any path traversal sequences or directory separators
-        String nameOnly = Path.of(filename).getFileName().toString();
-        // Replace non-whitelisted characters or excessive whitespace if needed, and truncate to 255 chars
-        nameOnly = nameOnly.trim();
+        String nameOnly = Path.of(filename).getFileName().toString().trim();
         if (nameOnly.length() > 255) {
             int extIndex = nameOnly.lastIndexOf('.');
             if (extIndex > 0 && extIndex >= nameOnly.length() - 10) {
@@ -174,4 +236,3 @@ public class NoteService {
         );
     }
 }
-

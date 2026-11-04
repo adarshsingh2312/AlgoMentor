@@ -68,6 +68,11 @@ app:
     seed-enabled: true
   notes:
     max-documents: 50
+  ai:
+    base-url: ${AI_SERVICE_URL:http://localhost:8000}
+    service-key: ${AI_SERVICE_KEY}
+    ingest-timeout-seconds: 30
+    ask-timeout-seconds: 60
 
 management:
   endpoints:
