@@ -5,7 +5,11 @@ import com.algomentor.dto.AiAskRequest;
 import com.algomentor.dto.AiDeleteResponse;
 import com.algomentor.dto.AiIngestRequest;
 import com.algomentor.dto.AiIngestResponse;
+import com.algomentor.dto.AiMentorHintRequest;
+import com.algomentor.dto.AiProblemDto;
 import com.algomentor.dto.AskNotesResponseDto;
+import com.algomentor.dto.MentorHintResponseDto;
+import com.algomentor.dto.MentorResetResponseDto;
 import com.algomentor.exception.AiUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +84,37 @@ public class AiServiceClient {
         } catch (ResourceAccessException | RestClientResponseException e) {
             log.error("AI service ask failed for userId={}: {}", userId, e.getMessage());
             throw new AiUnavailableException("AI service unavailable during question retrieval", e);
+        }
+    }
+
+    public MentorHintResponseDto getHint(UUID userId, AiProblemDto problem) {
+        try {
+            AiMentorHintRequest request = new AiMentorHintRequest(userId, problem);
+            return restClient.post()
+                    .uri("/mentor/hint")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(MentorHintResponseDto.class);
+        } catch (ResourceAccessException | RestClientResponseException e) {
+            log.error("AI service getHint failed for userId={}, problemId={}: {}", userId, problem.id(), e.getMessage());
+            throw new AiUnavailableException("AI service unavailable during hint generation", e);
+        }
+    }
+
+    public MentorResetResponseDto resetHint(UUID userId, UUID problemId) {
+        try {
+            return restClient.delete()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/mentor/hint")
+                            .queryParam("userId", userId)
+                            .queryParam("problemId", problemId)
+                            .build())
+                    .retrieve()
+                    .body(MentorResetResponseDto.class);
+        } catch (ResourceAccessException | RestClientResponseException e) {
+            log.error("AI service resetHint failed for userId={}, problemId={}: {}", userId, problemId, e.getMessage());
+            throw new AiUnavailableException("AI service unavailable during hint reset", e);
         }
     }
 }

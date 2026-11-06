@@ -22,6 +22,9 @@ public interface ProblemRepository extends JpaRepository<Problem, UUID> {
     @Query("SELECT DISTINCT p FROM Problem p LEFT JOIN FETCH p.tags WHERE p.id IN :ids")
     List<Problem> findByIdInWithTags(@Param("ids") Collection<UUID> ids);
 
+    @Query("SELECT p FROM Problem p LEFT JOIN FETCH p.tags WHERE p.id = :id")
+    Optional<Problem> findByIdWithTags(@Param("id") UUID id);
+
     Optional<Problem> findByContestIdAndProblemIndex(Integer contestId, String problemIndex);
 
     boolean existsByContestIdAndProblemIndex(Integer contestId, String problemIndex);
