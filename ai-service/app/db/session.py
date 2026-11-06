@@ -96,6 +96,18 @@ def init_db_schema() -> None:
 
     CREATE INDEX IF NOT EXISTS idx_note_chunks_embedding_hnsw 
         ON note_chunks USING hnsw (embedding vector_cosine_ops);
+
+    CREATE TABLE IF NOT EXISTS hint_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        problem_key TEXT NOT NULL,
+        level INT NOT NULL DEFAULT 1,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uk_hint_progress_user_problem UNIQUE (user_id, problem_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_hint_progress_lookup 
+        ON hint_progress (user_id, problem_key);
     """
     try:
         with get_db_connection() as conn:
