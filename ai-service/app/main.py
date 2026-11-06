@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api import health, ingest, ask
+from app.api import health, ingest, ask, mentor
 from app.config.settings import get_settings
 from app.db.session import init_db_schema, close_db_pool
 
@@ -26,4 +26,5 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(ingest.router)
 app.include_router(ask.router)
+app.include_router(mentor.router)
 
