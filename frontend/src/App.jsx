@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Navbar } from "./components/Navbar";
 
+import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { OAuthCallback } from "./pages/OAuthCallback";
 import { Dashboard } from "./pages/Dashboard";
@@ -23,7 +24,8 @@ export default function App() {
             <Navbar />
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <Routes>
-                {/* Public Auth Routes */}
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/auth/callback" element={<OAuthCallback />} />
 
@@ -79,9 +81,8 @@ export default function App() {
                   }
                 />
 
-                {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* Default redirect for unknown paths */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
           </div>
