@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public record RecommendationResponseDto(
         UUID id,
+        UUID problemId,
         String problemName,
         Integer rating,
         List<String> tags,
@@ -16,6 +17,10 @@ public record RecommendationResponseDto(
         String reason,
         String status
 ) {
+    public RecommendationResponseDto(UUID id, String problemName, Integer rating, List<String> tags, String url, String reason, String status) {
+        this(id, null, problemName, rating, tags, url, reason, status);
+    }
+
     public static RecommendationResponseDto from(Recommendation r) {
         Problem p = r.getProblem();
         List<String> tagNames = (p != null && p.getTags() != null)
@@ -24,6 +29,7 @@ public record RecommendationResponseDto(
 
         return new RecommendationResponseDto(
                 r.getId(),
+                p != null ? p.getId() : null,
                 p != null ? p.getName() : "Unknown",
                 p != null ? p.getRating() : null,
                 tagNames,

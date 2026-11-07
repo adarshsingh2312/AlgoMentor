@@ -1,6 +1,7 @@
 package com.algomentor.controller;
 
 import com.algomentor.config.AiProperties;
+import com.algomentor.config.CorsProperties;
 import com.algomentor.config.DateTimeConfig;
 import com.algomentor.config.JwtAuthFilter;
 import com.algomentor.config.JwtProperties;
@@ -47,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = MentorController.class)
 @Import({
         SecurityConfig.class,
+        CorsProperties.class,
         JwtAuthFilter.class,
         JwtService.class,
         JwtProperties.class,

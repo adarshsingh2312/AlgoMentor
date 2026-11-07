@@ -26,6 +26,16 @@ spring:
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   security:
     oauth2:
       client:
@@ -44,6 +54,8 @@ app:
     expiry-minutes: ${JWT_EXPIRY_MINUTES:60}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/auth/callback}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   codeforces:
     base-url: https://codeforces.com/api
     timeout-seconds: 10
@@ -61,7 +73,7 @@ app:
     daily-count: 3
   mail:
     enabled: true
-    from: digest@algomentor.local
+    from: ${MAIL_FROM:digest@algomentor.local}
     digest-cron: "0 0 7 * * *"
     base-url: ${APP_BASE_URL:http://localhost:5173}
   dsa:
