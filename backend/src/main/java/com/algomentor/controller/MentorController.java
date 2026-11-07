@@ -3,6 +3,7 @@ package com.algomentor.controller;
 import com.algomentor.dto.MentorHintRequestDto;
 import com.algomentor.dto.MentorHintResponseDto;
 import com.algomentor.dto.MentorResetResponseDto;
+import com.algomentor.dto.StruggledProblemDto;
 import com.algomentor.service.MentorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,6 +22,15 @@ import java.util.UUID;
 public class MentorController {
 
     private final MentorService mentorService;
+
+    @GetMapping("/struggles")
+    public ResponseEntity<List<StruggledProblemDto>> getStruggles(
+            @AuthenticationPrincipal UUID userId) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return ResponseEntity.ok(mentorService.getStruggledProblems(userId));
+    }
 
     @PostMapping("/hint")
     public ResponseEntity<MentorHintResponseDto> getHint(

@@ -41,6 +41,16 @@ public class NoteController {
         return ResponseEntity.status(HttpStatus.CREATED).body(result.note());
     }
 
+    @PostMapping("/mistake")
+    public ResponseEntity<NoteDocumentDetailDto> createMistakeNote(
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody com.algomentor.dto.CreateMistakeNoteRequest request) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(noteService.createMistakeNote(userId, request));
+    }
+
     @PostMapping("/{id}/reindex")
     public ResponseEntity<NoteDocumentDetailDto> reindexNote(
             @AuthenticationPrincipal UUID userId,

@@ -1,11 +1,17 @@
 package com.algomentor.service;
 
+import com.algomentor.domain.Problem;
+import com.algomentor.domain.Tag;
 import com.algomentor.domain.User;
+import com.algomentor.dto.StruggledProblemProjection;
 import com.algomentor.dto.SyncResult;
+import com.algomentor.repository.ProblemRepository;
+import com.algomentor.repository.SubmissionRepository;
 import com.algomentor.service.CodeforcesService.CfProblem;
 import com.algomentor.service.CodeforcesService.CfSubmission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,10 +24,25 @@ public class SyncService {
 
     private final CodeforcesService codeforcesService;
     private final UpsertService upsertService;
+    private final SubmissionRepository submissionRepository;
+    private final ProblemRepository problemRepository;
+    private final NoteService noteService;
 
-    public SyncService(CodeforcesService codeforcesService, UpsertService upsertService) {
+    @Autowired
+    public SyncService(CodeforcesService codeforcesService,
+                       UpsertService upsertService,
+                       SubmissionRepository submissionRepository,
+                       ProblemRepository problemRepository,
+                       NoteService noteService) {
         this.codeforcesService = codeforcesService;
         this.upsertService = upsertService;
+        this.submissionRepository = submissionRepository;
+        this.problemRepository = problemRepository;
+        this.noteService = noteService;
+    }
+
+    public SyncService(CodeforcesService codeforcesService, UpsertService upsertService) {
+        this(codeforcesService, upsertService, null, null, null);
     }
 
     /**
@@ -78,6 +99,36 @@ public class SyncService {
 
         log.info("[Sync] Submission sync completed for user {} (handle: {}): {} inserted, {} skipped",
                 user.getId(), handle, total.submissionsInserted(), total.submissionsSkipped());
+
+        autoIndexStruggles(user);
+
         return total;
+    }
+
+    private void autoIndexStruggles(User user) {
+        if (submissionRepository == null || problemRepository == null || noteService == null) {
+            return;
+        }
+        try {
+            List<StruggledProblemProjection> struggles = submissionRepository.findStruggledProblems(user.getId(), 2, 3);
+            if (struggles == null || struggles.isEmpty()) {
+                return;
+            }
+            log.info("[Sync] Auto-indexing {} struggled problems into AI memory for user {}", struggles.size(), user.getId());
+            for (StruggledProblemProjection s : struggles) {
+                List<String> tags = problemRepository.findByIdWithTags(s.getProblemId())
+                        .map(p -> p.getTags() != null ? p.getTags().stream().map(Tag::getName).toList() : List.<String>of())
+                        .orElse(List.of());
+                noteService.createAutoStruggleNote(
+                        user,
+                        s.getProblemName(),
+                        s.getRating(),
+                        tags,
+                        s.getFailedAttempts() != null ? s.getFailedAttempts() : 0L
+                );
+            }
+        } catch (Exception ex) {
+            log.warn("[Sync] Auto-indexing struggles for user {} encountered an error: {}", user.getId(), ex.getMessage());
+        }
     }
 }

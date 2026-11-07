@@ -189,6 +189,108 @@ public class NoteService {
         return aiServiceClient.ask(userId, question, 4);
     }
 
+    public NoteDocumentDetailDto createMistakeNote(UUID userId, com.algomentor.dto.CreateMistakeNoteRequest request) {
+        if (request == null || request.problemTitle() == null || request.mistakeText() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Problem title and mistake text are required");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        long count = noteDocumentRepository.countByUserId(userId);
+        if (count >= notesProperties.getMaxDocuments()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Maximum note limit reached (" + notesProperties.getMaxDocuments() + ")");
+        }
+
+        String tagsStr = (request.tags() != null && !request.tags().isEmpty())
+                ? String.join(", ", request.tags())
+                : "General";
+
+        StringBuilder contentBuilder = new StringBuilder();
+        contentBuilder.append("# Problem Takeaway & Mistake Log: ").append(request.problemTitle().trim()).append("\n\n");
+        contentBuilder.append("- **Tags/Topics**: ").append(tagsStr).append("\n");
+        contentBuilder.append("- **Logged At**: ").append(java.time.LocalDate.now()).append("\n\n");
+        contentBuilder.append("## What Went Wrong / Challenge Faced:\n");
+        contentBuilder.append(request.mistakeText().trim()).append("\n\n");
+
+        if (request.keyTakeaway() != null && !request.keyTakeaway().isBlank()) {
+            contentBuilder.append("## Key Invariant / Rule to Remember:\n");
+            contentBuilder.append(request.keyTakeaway().trim()).append("\n");
+        }
+
+        String markdownContent = contentBuilder.toString();
+        byte[] bytes = markdownContent.getBytes(StandardCharsets.UTF_8);
+        String contentHash = computeSha256Hex(bytes);
+
+        // Deduplication: if user already logged this exact mistake note
+        var existing = noteDocumentRepository.findByUserIdAndContentHash(userId, contentHash);
+        if (existing.isPresent()) {
+            return toDetailDto(existing.get());
+        }
+
+        String displayName = "Mistake Log: " + request.problemTitle().trim();
+        if (displayName.length() > 250) {
+            displayName = displayName.substring(0, 250);
+        }
+
+        NoteDocument saved = saveInitialNote(user, displayName, "text/markdown", bytes.length, contentHash, markdownContent);
+
+        NoteStatus finalStatus;
+        try {
+            aiServiceClient.ingest(saved.getId(), userId, saved.getDisplayName(), saved.getContent());
+            finalStatus = NoteStatus.INDEXED;
+            log.info("[RAG] Successfully ingested mistake log into AI vector memory for user={}, docId={}", userId, saved.getId());
+        } catch (Exception e) {
+            log.warn("[RAG] AI indexing failed for mistake log docId={}: {}. Marking status as FAILED", saved.getId(), e.getMessage());
+            finalStatus = NoteStatus.FAILED;
+        }
+
+        NoteDocument updated = updateNoteStatus(saved.getId(), finalStatus);
+        return toDetailDto(updated);
+    }
+
+    public void createAutoStruggleNote(User user, String problemName, Integer rating, List<String> tags, long failedAttempts) {
+        String tagsStr = (tags != null && !tags.isEmpty()) ? String.join(", ", tags) : "General";
+        String ratingStr = rating != null ? String.valueOf(rating) : "Unrated";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Codeforces Struggle Record: ").append(problemName).append("\n\n");
+        sb.append("- **Tags/Topics**: ").append(tagsStr).append("\n");
+        sb.append("- **Difficulty Rating**: ").append(ratingStr).append("\n");
+        sb.append("- **Failed Attempts Count**: ").append(failedAttempts).append(" submissions\n");
+        sb.append("- **Status**: Currently Unsolved\n\n");
+        sb.append("## Automated Struggle Diagnostic Context:\n");
+        sb.append("The student has struggled on this problem across ").append(failedAttempts)
+          .append(" unsuccessful attempts on Codeforces, facing repeated test failures. ")
+          .append("When mentoring the student on this or related topics (").append(tagsStr)
+          .append("), proactively encourage them to question their invariants, edge cases, and time-complexity assumptions.\n");
+
+        String content = sb.toString();
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        String hash = computeSha256Hex(bytes);
+
+        // Deduplicate: If already indexed for this user and content, don't recreate
+        if (noteDocumentRepository.findByUserIdAndContentHash(user.getId(), hash).isPresent()) {
+            return;
+        }
+
+        String displayName = "CF Struggle: " + problemName;
+        if (displayName.length() > 250) {
+            displayName = displayName.substring(0, 250);
+        }
+
+        NoteDocument saved = saveInitialNote(user, displayName, "text/markdown", bytes.length, hash, content);
+        try {
+            aiServiceClient.ingest(saved.getId(), user.getId(), saved.getDisplayName(), saved.getContent());
+            updateNoteStatus(saved.getId(), NoteStatus.INDEXED);
+            log.info("[RAG] Auto-indexed CF struggle problem '{}' into AI vector memory for user {}", problemName, user.getId());
+        } catch (Exception e) {
+            updateNoteStatus(saved.getId(), NoteStatus.FAILED);
+            log.warn("[RAG] Failed to auto-index struggle problem '{}': {}", problemName, e.getMessage());
+        }
+    }
+
     private String sanitizeFilename(String filename) {
         String nameOnly = Path.of(filename).getFileName().toString().trim();
         if (nameOnly.length() > 255) {

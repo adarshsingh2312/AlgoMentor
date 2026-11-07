@@ -101,4 +101,30 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
             WHERE s.user_id = :userId AND s.verdict = 'OK'
             """, nativeQuery = true)
     Set<UUID> findSolvedProblemIdsByUserId(@Param("userId") UUID userId);
+
+    @Query(value = """
+            SELECT 
+                p.id AS problemId,
+                p.name AS problemName,
+                p.rating AS rating,
+                p.url AS url,
+                COUNT(s.id) AS failedAttempts
+            FROM submissions s
+            JOIN problems p ON p.id = s.problem_id
+            WHERE s.user_id = :userId
+              AND s.verdict != 'OK'
+              AND p.id NOT IN (
+                  SELECT DISTINCT s2.problem_id 
+                  FROM submissions s2 
+                  WHERE s2.user_id = :userId AND s2.verdict = 'OK'
+              )
+            GROUP BY p.id, p.name, p.rating, p.url
+            HAVING COUNT(s.id) >= :minFails
+            ORDER BY COUNT(s.id) DESC, MAX(s.submitted_at) DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<com.algomentor.dto.StruggledProblemProjection> findStruggledProblems(
+            @Param("userId") UUID userId,
+            @Param("minFails") int minFails,
+            @Param("limit") int limit);
 }
