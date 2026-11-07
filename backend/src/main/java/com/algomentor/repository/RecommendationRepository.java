@@ -27,4 +27,7 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Query("SELECT r.problem.id FROM Recommendation r WHERE r.user.id = :userId AND r.recommendedDate >= :sinceDate")
     Set<UUID> findRecentlyRecommendedProblemIds(@Param("userId") UUID userId, @Param("sinceDate") LocalDate sinceDate);
+
+    @Query("SELECT r.problem.id FROM Recommendation r WHERE r.user.id = :userId AND r.status = com.algomentor.domain.RecommendationStatus.SOLVED")
+    Set<UUID> findSolvedRecommendedProblemIds(@Param("userId") UUID userId);
 }

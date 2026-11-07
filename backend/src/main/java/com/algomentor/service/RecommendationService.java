@@ -96,8 +96,12 @@ public class RecommendationService {
         int minRating = roundedBase - props.getWindowLower();
         int maxRating = roundedBase + props.getWindowUpper();
 
-        // 3. Exclusions: all solved problems + problems recommended in the last 14 days
+        // 3. Exclusions:
+        //    a) All problems solved via CF submissions (verdict = OK)
+        //    b) All problems ever marked SOLVED via recommendation tracking
+        //    c) Problems recommended in the last cooldownDays (to avoid repetition)
         Set<UUID> excludedIds = new HashSet<>(submissionRepository.findSolvedProblemIdsByUserId(user.getId()));
+        excludedIds.addAll(recommendationRepository.findSolvedRecommendedProblemIds(user.getId()));
         LocalDate cooldownDate = today.minusDays(props.getCooldownDays());
         excludedIds.addAll(recommendationRepository.findRecentlyRecommendedProblemIds(user.getId(), cooldownDate));
 
