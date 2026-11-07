@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { apiClient } from "../api/client";
+import { LogMistakeModal } from "../components/LogMistakeModal";
 
 export default function MentorChat() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialProblemId = searchParams.get("problemId") || "";
 
   const [recommendations, setRecommendations] = useState([]);
+  const [struggles, setStruggles] = useState([]);
   const [selectedProblemId, setSelectedProblemId] = useState(initialProblemId);
   const [loadingRecs, setLoadingRecs] = useState(true);
 
@@ -17,29 +19,40 @@ export default function MentorChat() {
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState(null);
   const [infoMessage, setInfoMessage] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  // Load today's recommendations for problem picker
+  // Load today's recommendations and struggled problems for problem picker
   useEffect(() => {
-    async function loadRecs() {
+    async function loadProblems() {
       setLoadingRecs(true);
       try {
-        const data = await apiClient("/api/me/recommendations/today");
-        const list = Array.isArray(data) ? data : [];
-        setRecommendations(list);
-        // If no problem selected yet and recommendations exist, select first one with a problemId
-        if (!initialProblemId && list.length > 0) {
-          const firstWithId = list.find((r) => r.problemId);
-          if (firstWithId) {
-            setSelectedProblemId(firstWithId.problemId);
+        const [recsData, strugglesData] = await Promise.all([
+          apiClient("/api/me/recommendations/today").catch(() => []),
+          apiClient("/api/me/mentor/struggles").catch(() => []),
+        ]);
+
+        const recList = Array.isArray(recsData) ? recsData : [];
+        const strList = Array.isArray(strugglesData) ? strugglesData : [];
+
+        setRecommendations(recList);
+        setStruggles(strList);
+
+        // If no problem selected yet, select first available from recommendations or struggles
+        if (!initialProblemId) {
+          if (recList.length > 0) {
+            const first = recList.find((r) => r.problemId || r.id);
+            if (first) setSelectedProblemId(first.problemId || first.id);
+          } else if (strList.length > 0) {
+            setSelectedProblemId(strList[0].problemId);
           }
         }
       } catch (err) {
-        setError(err.message || "Failed to load today's problems.");
+        setError(err.message || "Failed to load problems.");
       } finally {
         setLoadingRecs(false);
       }
     }
-    loadRecs();
+    loadProblems();
   }, [initialProblemId]);
 
   // When problem selection changes, update query param and clear local hints
@@ -140,7 +153,27 @@ export default function MentorChat() {
     }
   };
 
-  const currentProblem = recommendations.find((r) => (r.problemId || r.id) === selectedProblemId);
+  const allAvailableProblems = [
+    ...recommendations.map((r) => ({
+      id: r.problemId || r.id,
+      problemName: r.problemName,
+      rating: r.rating,
+      url: r.url,
+      tags: r.tags || [],
+      type: "REC",
+    })),
+    ...struggles.map((s) => ({
+      id: s.problemId,
+      problemName: s.problemName,
+      rating: s.rating,
+      url: s.url,
+      tags: s.tags || [],
+      failedAttempts: s.failedAttempts,
+      type: "STRUGGLE",
+    })),
+  ];
+
+  const currentProblem = allAvailableProblems.find((p) => p.id === selectedProblemId);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -148,24 +181,28 @@ export default function MentorChat() {
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Socratic Hint Ladder</h1>
         <p className="text-zinc-400 text-sm mt-1">
-          Get calibrated Socratic hints without spoiling the solution or seeing full code. Progresses sequentially from a guiding question (Level 1) to pattern identification (Level 2) and strategic approach (Level 3).
+          Get calibrated Socratic hints without spoiling the solution or seeing full code. Discuss today's recommendations or revisit problems where you struggled on Codeforces.
         </p>
       </div>
 
       {/* Problem Picker */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
         <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Select Problem from Today's Recommendations
+          Select Problem (Daily Picks or Past CF Struggles)
         </label>
         {loadingRecs ? (
-          <div className="text-sm text-zinc-500">Loading recommendations...</div>
-        ) : recommendations.length === 0 ? (
+          <div className="text-sm text-zinc-500">Loading problems...</div>
+        ) : allAvailableProblems.length === 0 ? (
           <div className="text-sm text-zinc-400">
-            No recommendations found for today. Visit the{" "}
-            <Link to="/recommendations" className="text-indigo-400 hover:underline">
-              Recommendations page
+            No problems found. Sync your Codeforces handle on the{" "}
+            <Link to="/dashboard" className="text-indigo-400 hover:underline">
+              Dashboard
             </Link>{" "}
-            to generate your daily set.
+            or visit{" "}
+            <Link to="/recommendations" className="text-indigo-400 hover:underline">
+              Recommendations
+            </Link>{" "}
+            to generate picks.
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -177,14 +214,29 @@ export default function MentorChat() {
               <option value="" disabled>
                 -- Choose a problem --
               </option>
-              {(recommendations || []).map((rec) => {
-                const id = rec.problemId || rec.id;
-                return (
-                  <option key={id} value={id}>
-                    {rec.problemName} {rec.rating ? `(Rating: ${rec.rating})` : ""}
-                  </option>
-                );
-              })}
+
+              {recommendations.length > 0 && (
+                <optgroup label="🎯 Today's Daily Recommendations">
+                  {recommendations.map((rec) => {
+                    const id = rec.problemId || rec.id;
+                    return (
+                      <option key={id} value={id}>
+                        {rec.problemName} {rec.rating ? `(Rating: ${rec.rating})` : ""}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
+
+              {struggles.length > 0 && (
+                <optgroup label="⚠️ My Codeforces Struggles (Unsolved with Failed Attempts)">
+                  {struggles.map((str) => (
+                    <option key={str.problemId} value={str.problemId}>
+                      {str.problemName} {str.rating ? `(Rating: ${str.rating})` : ""} — {str.failedAttempts} failed attempts
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             {currentProblem?.url && (
@@ -299,14 +351,26 @@ export default function MentorChat() {
       )}
 
       {/* Controls */}
-      <div className="flex items-center justify-between gap-3 pt-2">
-        <button
-          onClick={handleReset}
-          disabled={resetting || hints.length === 0 || !selectedProblemId}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 text-sm font-medium rounded-lg transition-colors cursor-pointer"
-        >
-          {resetting ? "Resetting..." : "Start over"}
-        </button>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            disabled={resetting || hints.length === 0 || !selectedProblemId}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+          >
+            {resetting ? "Resetting..." : "Start over"}
+          </button>
+
+          {currentProblem && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="px-3.5 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 text-sm font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <span>📝</span>
+              <span>Record Takeaway</span>
+            </button>
+          )}
+        </div>
 
         <button
           onClick={handleGetHint}
@@ -320,6 +384,16 @@ export default function MentorChat() {
             : "Bigger hint"}
         </button>
       </div>
+
+      {/* RAG Mistake / Takeaway Modal */}
+      {currentProblem && (
+        <LogMistakeModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          initialProblemTitle={currentProblem.problemName || "Practice Problem"}
+          initialTags={currentProblem.tags || []}
+        />
+      )}
     </div>
   );
 }

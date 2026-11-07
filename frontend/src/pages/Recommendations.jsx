@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../api/client";
+import { LogMistakeModal } from "../components/LogMistakeModal";
 
 export function Recommendations() {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [skippingId, setSkippingId] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeModalData, setActiveModalData] = useState({ title: "", tags: [] });
   const navigate = useNavigate();
 
   const loadTodayRecommendations = useCallback(async () => {
@@ -78,13 +81,25 @@ export function Recommendations() {
             Personalized recommendations prioritized by your weakest topics and target rating window.
           </p>
         </div>
-        <button
-          onClick={loadTodayRecommendations}
-          disabled={loading}
-          className="self-start sm:self-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-medium rounded-xl border border-slate-700 transition"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => {
+              setActiveModalData({ title: "", tags: [] });
+              setModalOpen(true);
+            }}
+            className="px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 text-sm font-semibold rounded-xl transition flex items-center gap-1.5"
+          >
+            <span>📝</span>
+            <span>Log Takeaway</span>
+          </button>
+          <button
+            onClick={loadTodayRecommendations}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-sm font-medium rounded-xl border border-slate-700 transition"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -170,6 +185,20 @@ export function Recommendations() {
                 </a>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveModalData({
+                        title: rec.problemName,
+                        tags: rec.tags || [],
+                      });
+                      setModalOpen(true);
+                    }}
+                    title="Log your mistake or key takeaway into AI memory"
+                    className="p-2 text-xs font-medium text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition"
+                  >
+                    📝
+                  </button>
+
                   {rec.status !== "SKIPPED" && rec.status !== "SOLVED" && (
                     <button
                       onClick={() => handleSkip(rec.id)}
@@ -193,6 +222,14 @@ export function Recommendations() {
           ))}
         </div>
       )}
+
+      {/* RAG Memory Log Modal */}
+      <LogMistakeModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        initialProblemTitle={activeModalData.title}
+        initialTags={activeModalData.tags}
+      />
     </div>
   );
 }
