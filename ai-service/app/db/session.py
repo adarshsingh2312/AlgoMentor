@@ -17,7 +17,8 @@ def get_conninfo(settings: Settings) -> str:
         f"port={settings.db_port} "
         f"dbname={settings.db_name} "
         f"user={settings.db_user} "
-        f"password={settings.db_password}"
+        f"password={settings.db_password} "
+        f"sslmode={settings.db_sslmode}"
     )
 
 

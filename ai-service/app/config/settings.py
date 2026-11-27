@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     db_name: str = Field(default="algomentor", validation_alias="DB_NAME")
     db_user: str = Field(default="postgres", validation_alias="DB_USER")
     db_password: str = Field(default="postgres", validation_alias="DB_PASSWORD")
+    db_sslmode: str = Field(default="prefer", validation_alias="DB_SSLMODE")
 
     # Service-to-service auth key (NO default, min 32 chars, refuses startup if invalid)
     ai_service_key: str = Field(..., min_length=32, validation_alias="AI_SERVICE_KEY")

@@ -1,0 +1,27 @@
+services:
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: algomentor-ai
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: algomentor-backend
+    restart: unless-stopped
+    depends_on:
+      - ai-service
+    env_file:
+      - .env
+    environment:
+      AI_SERVICE_URL: http://ai-service:8000
+      JAVA_OPTS: "-Xmx384m -Xms128m"
+    ports:
+      - "8080:8080"
