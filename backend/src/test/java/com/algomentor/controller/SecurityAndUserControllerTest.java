@@ -156,7 +156,8 @@ class SecurityAndUserControllerTest {
         updated.setRole(regularUser.getRole());
         updated.setCfHandle("petr");
 
-        when(userService.updateCfHandle(regularUser.getId(), "petr")).thenReturn(UserResponseDto.from(updated));
+        when(codeforcesService.fetchUserInfo("petr")).thenReturn(new CodeforcesService.CfUserInfo("petr", 3000, "legendary grandmaster", 3000, "legendary grandmaster"));
+        when(userService.updateCfHandle(regularUser.getId(), "petr", 3000, "legendary grandmaster")).thenReturn(updated);
 
         UpdateCfHandleRequest request = new UpdateCfHandleRequest("petr");
 
@@ -171,7 +172,7 @@ class SecurityAndUserControllerTest {
     @Test
     @DisplayName("PUT /api/me/cf-handle when Codeforces handle not found -> 400 Bad Request")
     void linkCfHandleNotFoundReturns400() throws Exception {
-        when(userService.updateCfHandle(regularUser.getId(), "non_existent_user_xyz"))
+        when(codeforcesService.fetchUserInfo("non_existent_user_xyz"))
                 .thenThrow(new CodeforcesHandleNotFoundException("non_existent_user_xyz"));
 
         UpdateCfHandleRequest request = new UpdateCfHandleRequest("non_existent_user_xyz");
@@ -188,7 +189,7 @@ class SecurityAndUserControllerTest {
     @Test
     @DisplayName("PUT /api/me/cf-handle when Codeforces is unreachable -> 502 Bad Gateway")
     void linkCfHandleServiceUnreachableReturns502() throws Exception {
-        when(userService.updateCfHandle(regularUser.getId(), "petr"))
+        when(codeforcesService.fetchUserInfo("petr"))
                 .thenThrow(new CodeforcesServiceException("Codeforces API is currently unreachable"));
 
         UpdateCfHandleRequest request = new UpdateCfHandleRequest("petr");
