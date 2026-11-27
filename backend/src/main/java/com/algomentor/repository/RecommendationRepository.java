@@ -30,4 +30,8 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Query("SELECT r.problem.id FROM Recommendation r WHERE r.user.id = :userId AND r.status = com.algomentor.domain.RecommendationStatus.SOLVED")
     Set<UUID> findSolvedRecommendedProblemIds(@Param("userId") UUID userId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Recommendation r WHERE r.user.id = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
 }

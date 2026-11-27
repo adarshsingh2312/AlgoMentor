@@ -102,6 +102,10 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
             """, nativeQuery = true)
     Set<UUID> findSolvedProblemIdsByUserId(@Param("userId") UUID userId);
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Submission s WHERE s.user.id = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
+
     @Query(value = """
             SELECT 
                 p.id AS problemId,
