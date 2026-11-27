@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="gemini", validation_alias="LLM_PROVIDER")
     llm_model: str = Field(default="gemini-3.5-flash", validation_alias="LLM_MODEL")
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_base_url: str = Field(default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL")
 
     # FastEmbed model
     embedding_model: str = Field(
