@@ -30,6 +30,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -251,7 +252,20 @@ public class NoteService {
     }
 
     public void createAutoStruggleNote(User user, String problemName, Integer rating, List<String> tags, long failedAttempts) {
-        String tagsStr = (tags != null && !tags.isEmpty()) ? String.join(", ", tags) : "General";
+        String displayName = "CF Struggle: " + problemName.trim();
+        if (displayName.length() > 250) {
+            displayName = displayName.substring(0, 250);
+        }
+
+        // 1. Primary Deduplication: Check by problem display name for this user
+        if (noteDocumentRepository.findByUserIdAndDisplayName(user.getId(), displayName).isPresent()) {
+            return;
+        }
+
+        // 2. Deterministic tags string (alphabetically sorted)
+        String tagsStr = (tags != null && !tags.isEmpty())
+                ? tags.stream().filter(java.util.Objects::nonNull).sorted().collect(Collectors.joining(", "))
+                : "General";
         String ratingStr = rating != null ? String.valueOf(rating) : "Unrated";
 
         StringBuilder sb = new StringBuilder();
@@ -270,14 +284,9 @@ public class NoteService {
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         String hash = computeSha256Hex(bytes);
 
-        // Deduplicate: If already indexed for this user and content, don't recreate
+        // 3. Secondary Deduplication by content hash
         if (noteDocumentRepository.findByUserIdAndContentHash(user.getId(), hash).isPresent()) {
             return;
-        }
-
-        String displayName = "CF Struggle: " + problemName;
-        if (displayName.length() > 250) {
-            displayName = displayName.substring(0, 250);
         }
 
         NoteDocument saved = saveInitialNote(user, displayName, "text/markdown", bytes.length, hash, content);
