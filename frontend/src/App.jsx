@@ -12,6 +12,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Recommendations } from "./pages/Recommendations";
 import { DsaRoadmap } from "./pages/DsaRoadmap";
 import Notes from "./pages/Notes";
+import StudyTutor from "./pages/StudyTutor";
 import MentorChat from "./pages/MentorChat";
 import Admin from "./pages/Admin";
 
@@ -59,6 +60,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <Notes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tutor"
+                  element={
+                    <ProtectedRoute>
+                      <StudyTutor />
                     </ProtectedRoute>
                   }
                 />

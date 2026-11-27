@@ -51,6 +51,19 @@ export function Navbar() {
                 <NavLink to="/mentor" className={navLinkClass}>
                   Mentor Chat
                 </NavLink>
+                <NavLink
+                  to="/tutor"
+                  className={({ isActive }) =>
+                    `inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all ${
+                      isActive
+                        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30"
+                        : "bg-indigo-600/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white"
+                    }`
+                  }
+                >
+                  <span>✨</span>
+                  <span>AI Study Tutor</span>
+                </NavLink>
                 {isAdmin && (
                   <NavLink
                     to="/admin"

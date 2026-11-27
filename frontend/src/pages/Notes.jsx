@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import { Link } from "react-router-dom";
 import { apiClient, ApiError } from "../api/client";
 
 export default function Notes() {
@@ -19,13 +20,6 @@ export default function Notes() {
 
   // Reindexing state
   const [reindexingId, setReindexingId] = useState(null);
-
-  // Ask notes state
-  const [question, setQuestion] = useState("");
-  const [asking, setAsking] = useState(false);
-  const [askError, setAskError] = useState(null);
-  const [askResult, setAskResult] = useState(null);
-  const askAbortControllerRef = useRef(null);
 
   const fetchNotes = async () => {
     try {
@@ -127,42 +121,6 @@ export default function Notes() {
     }
   };
 
-  // Ask notes
-  const handleAsk = async (e) => {
-    e.preventDefault();
-    if (!question.trim()) return;
-
-    setAsking(true);
-    setAskError(null);
-    setAskResult(null);
-
-    // 60-second AbortController timeout
-    const controller = new AbortController();
-    askAbortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-    try {
-      const response = await apiClient("/api/me/notes/ask", {
-        method: "POST",
-        body: JSON.stringify({ question: question.trim() }),
-        signal: controller.signal,
-      });
-      setAskResult(response);
-    } catch (err) {
-      if (err.status === 502) {
-        setAskError("AI service is temporarily unavailable. Please try again later.");
-      } else if (err.status === 408 || err.name === "AbortError") {
-        setAskError("The request timed out after 60 seconds. Please try a simpler query.");
-      } else {
-        setAskError(err.message || "Failed to get an answer.");
-      }
-    } finally {
-      clearTimeout(timeoutId);
-      setAsking(false);
-      askAbortControllerRef.current = null;
-    }
-  };
-
   const getStatusBadge = (status) => {
     switch (status) {
       case "INDEXED":
@@ -180,11 +138,21 @@ export default function Notes() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-100">DSA Notes & RAG</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          Upload your Markdown or text notes. They will be chunked, embedded, and indexed for semantic search and AI mentoring.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-100">DSA Notes &amp; Knowledge Base</h1>
+          <p className="text-zinc-400 text-sm mt-1">
+            Upload your Markdown or text notes. They will be chunked, embedded, and indexed for semantic search and AI mentoring.
+          </p>
+        </div>
+        <Link
+          to="/tutor"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-indigo-500/20 transition shrink-0"
+        >
+          <span>✨</span>
+          <span>Open AI Study Tutor</span>
+          <span>&rarr;</span>
+        </Link>
       </div>
 
       {/* Upload Section */}
@@ -208,72 +176,6 @@ export default function Notes() {
         </form>
         {uploadError && <p className="text-rose-400 text-xs mt-2">{uploadError}</p>}
         {uploadSuccess && <p className="text-emerald-400 text-xs mt-2">{uploadSuccess}</p>}
-      </div>
-
-      {/* Ask Notes Section */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-zinc-100 mb-2">Ask Your Notes (RAG)</h2>
-        <p className="text-xs text-zinc-400 mb-4">
-          Query your uploaded notes with semantic vector search. Responses cite relevant chunks directly from your notes.
-        </p>
-        <form onSubmit={handleAsk} className="flex gap-2">
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="e.g. How does binary lifting for LCA work?"
-            disabled={asking}
-            className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
-          />
-          <button
-            type="submit"
-            disabled={asking || !question.trim()}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
-          >
-            {asking ? "Thinking..." : "Ask"}
-          </button>
-        </form>
-
-        {askError && (
-          <div className="mt-4 p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-sm">
-            {askError}
-          </div>
-        )}
-
-        {askResult && (
-          <div className="mt-5 p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
-            <div>
-              <div className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">
-                AI Answer
-              </div>
-              <div className="prose prose-invert max-w-none text-zinc-200 text-sm leading-relaxed">
-                <ReactMarkdown>{askResult.answer}</ReactMarkdown>
-              </div>
-            </div>
-
-            {askResult.citations && askResult.citations.length > 0 && (
-              <div className="border-t border-zinc-800 pt-3">
-                <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                  Citations ({askResult.citations.length})
-                </div>
-                <div className="space-y-2">
-                  {askResult.citations.map((c, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-300"
-                    >
-                      <div className="flex items-center justify-between font-mono text-zinc-400 mb-1">
-                        <span>{c.displayName} (chunk #{c.chunkIndex})</span>
-                        <span className="text-zinc-500">score: {c.score ? c.score.toFixed(3) : "N/A"}</span>
-                      </div>
-                      <p className="line-clamp-2 text-zinc-400 italic">"{c.snippet}"</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Notes List Section */}
