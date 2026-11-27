@@ -10,7 +10,9 @@ public record UserResponseDto(
         String email,
         String name,
         Role role,
-        String cfHandle
+        String cfHandle,
+        Integer cfRating,
+        String cfRank
 ) {
     public static UserResponseDto from(User user) {
         return new UserResponseDto(
@@ -18,7 +20,9 @@ public record UserResponseDto(
                 user.getEmail(),
                 user.getName(),
                 user.getRole(),
-                user.getCfHandle()
+                user.getCfHandle(),
+                user.getCfRating(),
+                user.getCfRank()
         );
     }
 }

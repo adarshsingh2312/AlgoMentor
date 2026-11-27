@@ -36,7 +36,7 @@ public class SubmissionBatchBean {
         this.problemBatchBean = problemBatchBean;
     }
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
     public SyncResult processBatch(User user,
                                    List<CfSubmission> batch,
                                    Map<String, Tag> tagsByName,

@@ -34,6 +34,12 @@ public class User extends BaseEntity {
     @Column(name = "cf_handle")
     private String cfHandle;
 
+    @Column(name = "cf_rating")
+    private Integer cfRating;
+
+    @Column(name = "cf_rank", length = 50)
+    private String cfRank;
+
     @Column(name = "digest_enabled", nullable = false, columnDefinition = "boolean default true")
     private boolean digestEnabled = true;
 

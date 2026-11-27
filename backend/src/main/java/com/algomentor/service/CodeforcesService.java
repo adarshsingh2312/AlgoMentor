@@ -83,6 +83,35 @@ public class CodeforcesService {
     }
 
     /**
+     * Fetch user profile info including current rating and rank.
+     * Returns null values gracefully if the user is unrated.
+     */
+    public CfUserInfo fetchUserInfo(String handle) {
+        throttle();
+        try {
+            CfUserInfoEnvelope response = restClient.get()
+                    .uri("/user.info?handles={h}", handle)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
+                        throw new CodeforcesHandleNotFoundException(handle);
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, resp) -> {
+                        throw new CodeforcesServiceException(
+                                "Codeforces API returned an error (" + resp.getStatusCode() + ")");
+                    })
+                    .body(CfUserInfoEnvelope.class);
+
+            if (response == null || !"OK".equalsIgnoreCase(response.status())
+                    || response.result() == null || response.result().isEmpty()) {
+                throw new CodeforcesHandleNotFoundException(handle);
+            }
+            return response.result().get(0);
+        } catch (ResourceAccessException e) {
+            throw new CodeforcesServiceException("Codeforces API is currently unreachable", e);
+        }
+    }
+
+    /**
      * Fetch the full problemset. Retried with backoff.
      * @return list of CF problem DTOs (never null, may be empty)
      */
@@ -232,6 +261,13 @@ public class CodeforcesService {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record CfEnvelope(String status, String comment)
             implements CfEnvelopeBase {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CfUserInfoEnvelope(String status, String comment, List<CfUserInfo> result)
+            implements CfEnvelopeBase {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CfUserInfo(String handle, Integer rating, String rank, Integer maxRating, String maxRank) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record CfProblemsetEnvelope(String status, String comment, CfProblemsetResult result)

@@ -32,7 +32,7 @@ public class ProblemBatchBean {
         this.tagRepository = tagRepository;
     }
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
     public SyncResult processBatch(List<CfProblem> batch,
                                    Map<String, Tag> tagsByName,
                                    Map<String, Problem> problemsByKey) {
