@@ -68,7 +68,7 @@ public class NoteController {
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
-        return ResponseEntity.ok(noteService.ask(userId, request.question()));
+        return ResponseEntity.ok(noteService.ask(userId, request.question(), request.history()));
     }
 
     @GetMapping

@@ -3,11 +3,14 @@ package com.algomentor.service;
 import com.algomentor.config.AiProperties;
 import com.algomentor.dto.AiAskRequest;
 import com.algomentor.dto.AiDeleteResponse;
+import com.algomentor.dto.AiEnrichTagRequest;
+import com.algomentor.dto.AiEnrichTagResponse;
 import com.algomentor.dto.AiIngestRequest;
 import com.algomentor.dto.AiIngestResponse;
 import com.algomentor.dto.AiMentorHintRequest;
 import com.algomentor.dto.AiProblemDto;
 import com.algomentor.dto.AskNotesResponseDto;
+import com.algomentor.dto.ChatMessageDto;
 import com.algomentor.dto.MentorHintResponseDto;
 import com.algomentor.dto.MentorResetResponseDto;
 import com.algomentor.exception.AiUnavailableException;
@@ -73,8 +76,12 @@ public class AiServiceClient {
     }
 
     public AskNotesResponseDto ask(UUID userId, String question, int topK) {
+        return ask(userId, question, topK, java.util.List.of());
+    }
+
+    public AskNotesResponseDto ask(UUID userId, String question, int topK, java.util.List<ChatMessageDto> history) {
         try {
-            AiAskRequest request = new AiAskRequest(userId, question, topK);
+            AiAskRequest request = new AiAskRequest(userId, question, topK, history != null ? history : java.util.List.of());
             return restClient.post()
                     .uri("/ask")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -115,6 +122,21 @@ public class AiServiceClient {
         } catch (ResourceAccessException | RestClientResponseException e) {
             log.error("AI service resetHint failed for userId={}, problemId={}: {}", userId, problemId, e.getMessage());
             throw new AiUnavailableException("AI service unavailable during hint reset", e);
+        }
+    }
+
+    public AiEnrichTagResponse enrichTag(String tag) {
+        try {
+            AiEnrichTagRequest request = new AiEnrichTagRequest(tag);
+            return restClient.post()
+                    .uri("/knowledge/enrich-tag")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(AiEnrichTagResponse.class);
+        } catch (ResourceAccessException | RestClientResponseException e) {
+            log.warn("AI service enrichTag failed for tag='{}': {}", tag, e.getMessage());
+            throw new AiUnavailableException("AI service unavailable during tag knowledge enrichment", e);
         }
     }
 }

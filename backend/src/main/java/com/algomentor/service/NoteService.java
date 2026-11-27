@@ -29,7 +29,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +45,7 @@ public class NoteService {
     private final UserRepository userRepository;
     private final NotesProperties notesProperties;
     private final AiServiceClient aiServiceClient;
+    private final Set<String> enrichedTagsCache = ConcurrentHashMap.newKeySet();
 
     public NoteUploadResult upload(UUID userId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -190,6 +194,10 @@ public class NoteService {
         return aiServiceClient.ask(userId, question, 4);
     }
 
+    public AskNotesResponseDto ask(UUID userId, String question, List<com.algomentor.dto.ChatMessageDto> history) {
+        return aiServiceClient.ask(userId, question, 4, history);
+    }
+
     public NoteDocumentDetailDto createMistakeNote(UUID userId, com.algomentor.dto.CreateMistakeNoteRequest request) {
         if (request == null || request.problemTitle() == null || request.mistakeText() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Problem title and mistake text are required");
@@ -259,6 +267,8 @@ public class NoteService {
 
         // 1. Primary Deduplication: Check by problem display name for this user
         if (noteDocumentRepository.findByUserIdAndDisplayName(user.getId(), displayName).isPresent()) {
+            // Still ensure tags for existing struggle notes are enriched in global knowledge base
+            enrichTagsIfNeeded(tags);
             return;
         }
 
@@ -298,6 +308,46 @@ public class NoteService {
             updateNoteStatus(saved.getId(), NoteStatus.FAILED);
             log.warn("[RAG] Failed to auto-index struggle problem '{}': {}", problemName, e.getMessage());
         }
+
+        // Enrich global AI knowledge base for each struggled tag (non-fatal, deduped on AI service)
+        enrichTagsIfNeeded(tags);
+    }
+
+    private void enrichTagsIfNeeded(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return;
+        }
+        List<String> pendingTags = tags.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .map(t -> t.trim().toLowerCase(Locale.ROOT))
+                .distinct()
+                .filter(t -> !enrichedTagsCache.contains(t))
+                .toList();
+
+        if (pendingTags.isEmpty()) {
+            return;
+        }
+
+        // Run asynchronously in background so /api/me/sync returns immediately
+        // without blocking on Gemini free-tier latency or rate limits.
+        CompletableFuture.runAsync(() -> {
+            for (String normalized : pendingTags) {
+                if (!enrichedTagsCache.add(normalized)) {
+                    continue; // Already claimed or enriched by another thread
+                }
+                try {
+                    var res = aiServiceClient.enrichTag(normalized);
+                    if (res != null && "ENRICHED".equals(res.status())) {
+                        log.info("[Knowledge] Enriched global RAG knowledge for tag '{}' ({} chunks)",
+                                res.tag(), res.chunksCount());
+                    }
+                } catch (Exception e) {
+                    // Remove from cache on failure so a future sync can retry
+                    enrichedTagsCache.remove(normalized);
+                    log.warn("[Knowledge] Non-fatal: failed to enrich tag '{}': {}", normalized, e.getMessage());
+                }
+            }
+        });
     }
 
     private String sanitizeFilename(String filename) {
