@@ -121,7 +121,7 @@ def test_threshold_avoids_llm_call():
 
         assert response.status_code == 200
         data = response.json()
-        assert data["answer"] == "I couldn't find this in your notes"
+        assert data["answer"] == "I couldn't find this in your notes or knowledge base."
         assert data["citations"] == []
         # CRITICAL ASSERTION: LLM must NEVER have been called!
         assert spy_llm.calls == 0
@@ -205,6 +205,168 @@ def test_ingest_idempotency_and_tenant_isolation():
         assert res2.json()["chunksCount"] == count1
         # Confirms DELETE was executed prior to re-insertion
         assert len(deleted) == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Test 4: Knowledge Enrichment Endpoint (New Tag + Dedup)
+# ---------------------------------------------------------------------------
+def test_enrich_tag_new_and_dedup():
+    spy_llm = SpyLlmService()
+    fake_embedder = FakeEmbedder()
+    existing_tags = set()
+
+    class FakeKnowledgeCursor:
+        def __init__(self):
+            self._last_result = None
+
+        def execute(self, query, params=None):
+            q = query.strip().upper()
+            if q.startswith("SELECT 1 FROM NOTE_CHUNKS"):
+                display_name = params[1]
+                self._last_result = (1,) if display_name in existing_tags else None
+            elif q.startswith("INSERT INTO NOTE_CHUNKS"):
+                display_name = params[3]
+                existing_tags.add(display_name)
+
+        def fetchone(self):
+            return self._last_result
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    class FakeTxContext:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    class FakeKnowledgeConn:
+        def transaction(self):
+            return FakeTxContext()
+
+        def rollback(self):
+            pass
+
+        def cursor(self):
+            return FakeKnowledgeCursor()
+
+    from app.db.session import get_db
+
+    app.dependency_overrides[get_db] = lambda: FakeKnowledgeConn()
+    app.dependency_overrides[get_embedder] = lambda: fake_embedder
+    app.dependency_overrides[get_llm_service] = lambda: spy_llm
+
+    try:
+        settings = get_settings()
+        client = TestClient(app)
+
+        # First call: should generate guide via LLM and ingest
+        res1 = client.post(
+            "/knowledge/enrich-tag",
+            headers={"X-Service-Key": settings.ai_service_key},
+            json={"tag": "Binary Search"},
+        )
+        assert res1.status_code == 200
+        data1 = res1.json()
+        assert data1["tag"] == "binary search"
+        assert data1["status"] == "ENRICHED"
+        assert data1["chunksCount"] >= 1
+        assert spy_llm.calls == 1
+
+        # Second call for same tag: should return ALREADY_EXISTS with NO extra LLM call
+        res2 = client.post(
+            "/knowledge/enrich-tag",
+            headers={"X-Service-Key": settings.ai_service_key},
+            json={"tag": "binary search"},
+        )
+        assert res2.status_code == 200
+        data2 = res2.json()
+        assert data2["status"] == "ALREADY_EXISTS"
+        assert data2["chunksCount"] == 0
+        assert spy_llm.calls == 1  # Still 1!
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Test 5: Multi-turn Chat History Passed to Prompt & Retrieval
+# ---------------------------------------------------------------------------
+def test_ask_with_conversation_history():
+    captured_queries = []
+    captured_prompts = []
+
+    class CaptureEmbedder:
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [[0.1] * 384 for _ in texts]
+
+        def embed_query(self, text: str) -> list[float]:
+            captured_queries.append(text)
+            return [0.1] * 384
+
+    class CaptureLlmService:
+        def generate(self, prompt: str, system_instruction: str | None = None) -> str:
+            captured_prompts.append(prompt)
+            return "Greedy choice takes O(n log n) with sorting [1]."
+
+    class FakeChatCursor:
+        def execute(self, query, params=None):
+            pass
+
+        def fetchall(self):
+            return [
+                (
+                    uuid.uuid4(),
+                    "[Knowledge] Greedy",
+                    0,
+                    "Greedy algorithms make locally optimal choices.",
+                    0.82,
+                    "knowledge",
+                )
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    class FakeChatConn:
+        def cursor(self):
+            return FakeChatCursor()
+
+    from app.db.session import get_db
+
+    app.dependency_overrides[get_db] = lambda: FakeChatConn()
+    app.dependency_overrides[get_embedder] = lambda: CaptureEmbedder()
+    app.dependency_overrides[get_llm_service] = lambda: CaptureLlmService()
+
+    try:
+        settings = get_settings()
+        client = TestClient(app)
+        res = client.post(
+            "/ask",
+            headers={"X-Service-Key": settings.ai_service_key},
+            json={
+                "userId": str(uuid.uuid4()),
+                "question": "What is its time complexity?",
+                "topK": 4,
+                "history": [
+                    {"role": "user", "content": "What is greedy algorithm?"},
+                    {"role": "assistant", "content": "A greedy algorithm makes the locally optimal choice."},
+                ],
+            },
+        )
+        assert res.status_code == 200
+        assert "What is greedy algorithm?" in captured_queries[0]
+        assert "What is its time complexity?" in captured_queries[0]
+        assert "<conversation_history>" in captured_prompts[0]
+        assert "Student: What is greedy algorithm?" in captured_prompts[0]
     finally:
         app.dependency_overrides.clear()
 

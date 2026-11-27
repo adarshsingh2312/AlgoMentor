@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -36,10 +37,16 @@ class Citation(BaseSchema):
     score: float
 
 
+class ChatMessage(BaseSchema):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
 class AskRequest(BaseSchema):
     user_id: UUID = Field(..., alias="userId")
     question: str = Field(..., min_length=1, max_length=1000)
     top_k: int = Field(default=4, ge=1, le=8, alias="topK")
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
 
 
 class AskResponse(BaseSchema):
@@ -79,5 +86,17 @@ class HintOut(BaseModel):
     hint: str = Field(description="The hint text complying with the level constraints")
     follow_up_question: str = Field(description="A short encouraging follow-up question")
     uses_notes: bool = Field(description="Whether personal study notes informed this hint")
+
+
+# ── Knowledge Enrichment ──────────────────────────────────────────────────────
+
+class EnrichTagRequest(BaseSchema):
+    tag: str = Field(..., min_length=1, max_length=100)
+
+
+class EnrichTagResponse(BaseSchema):
+    tag: str
+    status: str          # "ENRICHED" | "ALREADY_EXISTS" | "EMPTY_RESPONSE" | "NO_CHUNKS"
+    chunks_count: int = Field(..., alias="chunksCount")
 
 
